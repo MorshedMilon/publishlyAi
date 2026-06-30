@@ -1,0 +1,32 @@
+# P06 Validation Gate — Gate 1 thresholds (operative mirror of QUALITY-STANDARDS §2).
+#
+# SOURCE OF TRUTH IS QUALITY-STANDARDS §2. These values exist here so the gate can be
+# CALIBRATED (QUALITY-STANDARDS §7) without code edits — never hardcoded in Python
+# (SPEC-P06 Thresholds, CLAUDE §8.2). Any change here MUST also land in QUALITY-STANDARDS
+# and be logged in DECISIONS with the kill-rate / sell-through evidence that motivated it.
+# Lowering 0.60 to pass a favourite is a DECISIONS conversation, not a quiet edit.
+
+# Weighted composite weights — Σ = 1.0 (QUALITY-STANDARDS §2 table).
+weights:
+  demand: 0.25
+  weakness: 0.25
+  differentiation: 0.20
+  defensibility: 0.15
+  price_headroom: 0.15
+
+# Per-criterion hard floor: every criterion must clear this or the niche is killed —
+# a fatal weakness is never averaged away (QUALITY-STANDARDS §2).
+floor: 0.60
+
+# Weighted composite pass bar. `>=` is a pass (borderline 0.72 passes; deterministic).
+composite_pass: 0.72
+
+# Kill-rate canary: a run that kills fewer than this fraction likely has leniency drift —
+# alert and investigate the prompt; raise floors per QUALITY-STANDARDS §7 (don't relax code).
+kill_rate_alert_below: 0.70
+
+# Scoring temperature for PR-P06 (low → consistent judgment; SPEC-P06 Thresholds).
+temperature: 0.2
+
+# Prompt identity recorded on every verdict for reproducibility (SPEC-P06 step 5).
+prompt_id: "PR-P06-validation v1.0"
