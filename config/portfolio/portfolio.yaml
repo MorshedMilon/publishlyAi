@@ -1,0 +1,24 @@
+# P26 Portfolio Manager config (SPEC-P26 Thresholds).
+# Operative values live here, not in code, so the portfolio bars can be tuned without edits
+# (CLAUDE §8.2 — a threshold change is a config edit, never a quiet code change).
+
+# A live product is a WINNER when it shows real, sustained sell-through: at least
+# `signal_units` units across the trailing `window_days`, spread over at least
+# `min_snapshots` tracking snapshots (one fat snapshot is a fluke, not a trend —
+# SPEC-P26 "winner false positive").
+sell_through:
+  signal_units: 5        # >= N units...
+  window_days: 60        # ...in the trailing window
+  min_snapshots: 2       # sustained across >= this many snapshots (fluke guard)
+
+# A live product is a DUD when it has had zero sales across `no_sales_window_days` AND is
+# past the `grace_period_days` since launch AND is not seasonal. A dud is only ever PROPOSED
+# for retirement — never auto-unpublished (SPEC-P26 / CLAUDE §13).
+retirement:
+  no_sales_window_days: 90
+  grace_period_days: 30  # new products are exempt from dud classification (too early to call)
+
+# Family fan-out: a winner spawns at most `cap` family-expansion candidates, so a proven
+# winner can never become a near-duplicate swarm (CLAUDE §3.3 / §3.4 — a ban vector, not a win).
+expansion:
+  cap: 3

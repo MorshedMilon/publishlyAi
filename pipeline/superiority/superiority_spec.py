@@ -125,8 +125,11 @@ def _process_niche(niche, cfg, generate_fn, measure_fallback, result: SpecResult
 
         check = validators.validate_spec(spec, corpus, cfg, measure_fallback=measure_fallback)
         if check.ok:
+            # P26 family candidate? carry the proven parent onto the real lineage column.
+            expansion = (niche.get("raw_research") or {}).get("expansion") or {}
             product = supabase_client.insert(PRODUCTS, {
                 "niche_id": nid,
+                "parent_product_id": expansion.get("parent_product_id"),
                 "channel": channel,
                 "superiority_spec": spec,
                 "gap_thesis": spec.get("one_sentence_reason"),
