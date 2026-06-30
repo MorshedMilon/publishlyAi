@@ -1,0 +1,24 @@
+# P12 Review Dashboard — operative values (SPEC-P12).
+# The dashboard is the ONLY web surface in the pipeline: it captures the two human
+# touchpoints (CLAUDE §9 Select / Approve) and writes status. It never generates or
+# publishes. Every operative value lives here, never in code (CLAUDE §8.2).
+
+# --- Operator identity (single local operator at MVP, SPEC-P12 Out of scope). ---
+# Written automatically into products.human_selected_by / human_approved_by on action.
+operator: "Milan"
+
+# --- Local server (binds 127.0.0.1 ONLY — never exposed; no auth at MVP). ---
+host: "127.0.0.1"
+port: 8012
+
+# --- Select view soft cap (CLAUDE §4.5 / §3.2 velocity discipline). ---
+# A running count of today's selections is shown; at/above this the UI WARNS — it never
+# hard-blocks (SPEC-P12 Acceptance test). The number floats down freely, never up.
+select_daily_cap: 5
+
+# --- Queue page size (keep the page responsive; SPEC-P12 edge: large lists). ---
+queue_limit: 100
+
+# --- File-serving sandbox: the PDF/cover preview endpoint may ONLY read under this dir
+#     (repo-relative). Prevents the localhost backend from serving arbitrary files. ---
+build_dir: "build"
