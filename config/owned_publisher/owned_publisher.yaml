@@ -1,0 +1,46 @@
+# P14 Owned Publisher — operative values (SPEC-P14, CHANNEL-SPEC §5, COMPLIANCE §4/§9).
+# Owned storefronts (Payhip / Gumroad) — "the channel where you keep the customer" (CLAUDE §5.3).
+# "Code decides": the orchestrator (pipeline/owned_publisher/publisher.py) enforces the compliance
+# gate, idempotency, the email-capture verification, and the partial-upload/auth/rate-limit edge
+# cases; the publishable values tune here, not in code (CLAUDE §8.2). Credentials are NOT here —
+# they live in .env (server-side only): PAYHIP_API_KEY, GUMROAD_ACCESS_TOKEN.
+#
+# RECENCY CAVEAT (CHANNEL-SPEC §5 + spec "verify current API + fees"): the Payhip/Gumroad
+# product-CREATION API surface is limited and shifts; endpoints/field names in owned_client.py MUST
+# be re-verified against each platform's current docs before a live publish, and product creation
+# may require a manual/UI step on some plans. The acceptance test's Part 2 (injected fake client) is
+# the authoritative proof of THIS module's orchestration; Part 3 (real API) is creds-gated + optional.
+
+# --- Platform selection (SPEC-P14: config payhip | gumroad; same asset can go to both). ---
+default_platform: "payhip"               # Payhip: lower fees + strong built-in email capture
+platforms:
+  payhip:
+    api_base: "https://payhip.com/api/v2"
+  gumroad:
+    api_base: "https://api.gumroad.com/v2"
+
+# --- Create-product fixed fields ---
+default_currency: "usd"
+default_price_usd: 7.0                    # fallback when the listing block carries no price
+
+# --- Email capture (CHANNEL-SPEC §5 step 4; the P14-defining requirement, CLAUDE §5.3). ---
+# Verified ON against the created-product response by the orchestrator — never just sent-and-assumed.
+enable_email_capture: true
+
+# --- Publish (CHANNEL-SPEC §5 step 5; approval already happened at P12 §9.2) ---
+publish_on_publish: true                 # go live after upload (analogue of Etsy's activate_on_publish)
+
+# --- Compliance markers (COMPLIANCE §4/§9; mirrors config/etsy_publisher + config/listing). ---
+# Owned channels have no Etsy tags/attribute, so only the disclosure line + craft-phrase screen apply.
+disclosure_marker: "Designed by seller"  # must appear in the buyer-facing description (§9 line ends with it)
+ai_flag_field: "ai_generative_used"      # carried through to the audit record (disclosure_applied)
+banned_craft_phrases:                    # forbidden on AI products — never "handmade"/"made by hand"
+  - handmade
+  - hand made
+  - hand-made
+  - "made by hand"
+  - "made by"
+
+# --- Rate-limit discipline (SPEC-P14 edge case: auth failure surfaced; bounded retry on 429). ---
+max_retries: 3                           # retries on HTTP 429 only
+backoff_seconds: 2                       # linear backoff: attempt * backoff_seconds

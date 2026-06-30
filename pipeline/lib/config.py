@@ -39,6 +39,10 @@ class Settings:
     etsy_oauth_token: str | None
     etsy_refresh_token: str | None
     etsy_shop_id: str | None
+    # Owned-storefront credentials (SPEC-P14: Payhip / Gumroad). Optional for the same reason as the
+    # Etsy creds above — only a real publish needs them; the P14 acceptance test uses a fake client.
+    payhip_api_key: str | None
+    gumroad_access_token: str | None
 
 
 def _load() -> Settings:
@@ -64,6 +68,8 @@ def _load() -> Settings:
         etsy_oauth_token=os.environ.get("ETSY_OAUTH_TOKEN"),
         etsy_refresh_token=os.environ.get("ETSY_REFRESH_TOKEN"),
         etsy_shop_id=os.environ.get("ETSY_SHOP_ID"),
+        payhip_api_key=os.environ.get("PAYHIP_API_KEY"),
+        gumroad_access_token=os.environ.get("GUMROAD_ACCESS_TOKEN"),
     )
 
 
