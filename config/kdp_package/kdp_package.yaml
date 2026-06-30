@@ -1,0 +1,35 @@
+# P15 KDP Package Builder — operative values (SPEC-P15, CHANNEL-SPEC §6, COMPLIANCE §2).
+# This module assembles a ready-to-upload KDP package only. It NEVER uploads to KDP and has NO
+# API/browser client (CLAUDE-Publishing §3.1/§13) — a human publishes by hand. Every threshold lives
+# here so the bar tunes without code edits (CLAUDE §8.2). The brand name is NOT duplicated here:
+# validators.load_config splices it from the cover config (single source of truth, like P09 does for
+# fonts).
+
+# Where the per-product package directory is written (output/kdp/{product_id}/).
+output_dir: "output/kdp"
+
+# KDP paperback minimum (COMPLIANCE §2.4). An interior below this cannot be packaged (removal risk).
+min_pages: 24
+
+# Low-content vs medium-content by product type (COMPLIANCE §2.3/§6). Low-content products tick the
+# KDP low-content box and need NO ISBN. Medium-content products do the opposite: no low-content box,
+# ISBN required. A product_type in neither list is treated as text-heavy/medium (no low-content box,
+# ISBN needed) — the conservative default (a wrongly-ticked low-content box is a removal vector).
+low_content_types:
+  - planner
+  - journal
+  - logbook
+  - notebook
+  - tracker
+  - diary
+medium_content_types:
+  - coloring
+  - activity
+  - puzzle
+  - workbook
+
+# Pricing for the metadata sheet. The KDP listing block carries no price, so we fall back to this
+# (a concrete number the human can adjust at upload). Royalty note surfaced on the checklist:
+# since Jun 2025 the print royalty under $9.99 is 50% (was 60%) — price with this in mind.
+default_price_usd: 9.99
+royalty_note: "KDP print royalty is 50% under $9.99 (since Jun 2025). Price with the royalty band in mind."
