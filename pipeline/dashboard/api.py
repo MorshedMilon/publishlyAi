@@ -24,6 +24,7 @@ from typing import Any
 import yaml
 
 from pipeline.lib import supabase_client
+from pipeline.publish_ledger import ledger
 
 NICHES, PRODUCTS, QC, LISTINGS = "niches", "products", "qc_results", "listings"
 
@@ -303,7 +304,9 @@ def mark_kdp_published(
     disclosure_applied: dict | None = None,
 ) -> dict:
     """KDP is uploaded by hand (CLAUDE §3.1 — never automated). After the human uploads, this
-    records the ledger row. The ASIN is required (SPEC-P12 edge: block until entered)."""
+    records the ledger row by delegating to P16 (`ledger.record_publish` is the single ledger
+    writer): idempotent on the ASIN, and it advances the product to 'published' once KDP is the
+    last intended channel to go live. The ASIN is required (SPEC-P12 edge: block until entered)."""
     asin = (asin or "").strip()
     if not asin:
         raise ValueError("ASIN is required to mark a KDP title published")
@@ -312,15 +315,13 @@ def mark_kdp_published(
         raise ValueError(f"product {product_id} not found")
     if disclosure_applied is None:
         disclosure_applied = rows[0].get("ai_disclosure") or {}
-    row = {
-        "product_id": product_id,
-        "channel": "kdp",
-        "external_id": asin,
-        "listing_url": listing_url,
-        "price": price,
-        "disclosure_applied": disclosure_applied,
-        "status": "live",
-        "published_at": _now_iso(),
-    }
-    inserted = supabase_client.insert(LISTINGS, row)
-    return {"ok": True, "product_id": product_id, "listing": inserted[0] if inserted else row}
+    rec = ledger.record_publish(
+        product_id=product_id,
+        channel="kdp",
+        external_id=asin,
+        listing_url=listing_url,
+        price=price,
+        disclosure_applied=disclosure_applied,
+        status="live",
+    )
+    return {"ok": True, "product_id": product_id, "listing": rec["listing"]}

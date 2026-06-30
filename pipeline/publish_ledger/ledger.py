@@ -10,13 +10,17 @@ Contract enforced here (SPEC-P16 Logic + edge cases):
     identifier; esp. KDP). A `failed` row may omit it (the publish never produced one).
   - Idempotent on (`product_id`, `channel`, `external_id`): re-recording the same listing is a
     no-op (select-first, insert-if-absent) — never a second row for the same listing.
-  - On a `live` row, flip `products.status='published'`. This MVP is single-channel Etsy, so one
-    live channel = published; the multi-channel "only once ALL intended channels are live" rule is
-    deferred with the rest of P16.
+  - On a `live` row, flip `products.status='published'` ONLY once every one of the product's
+    intended channels has a live listings row (SPEC-P16 "Partial multi-channel" edge case). A
+    product's intended channels are the keys of `metadata.listings` (what P12's approve-queue
+    computes as `channels`), falling back to the single `products.channel`.
 
-DEFERRED to P16's full build (NOT in this minimal slice): the KDP human-confirmed Mark-published
-path (P15 + P12 — today P12 writes that row directly), the retire path (P26 -> status='retired'),
-and any read/query/reconciliation API.
+This module is the ONLY writer of the ledger across all channels: P13/P14 hand off here after a
+successful auto-publish, and P12's KDP Mark-published delegates here after the human confirms the
+upload (KDP is never automated — CLAUDE §3.1; its live row only ever exists post-confirm).
+
+DEFERRED (NOT in scope here): the retire path (P26 -> status='retired') and any read/query/
+reconciliation API.
 """
 
 from __future__ import annotations
@@ -28,12 +32,32 @@ from pipeline.lib import supabase_client
 
 PRODUCTS, LISTINGS = "products", "listings"
 
-# Channels that participate in this minimal single-channel "published once live" rule.
-_AUTO_PUBLISH_CHANNELS = {"etsy", "payhip", "gumroad"}
+_VALID_CHANNELS = {"etsy", "payhip", "gumroad", "kdp"}
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _intended_channels(product: dict[str, Any], fallback_channel: str) -> set[str]:
+    """The channels a product is meant to go live on. Primary source: the keys of
+    `metadata.listings` (the per-channel listing assets P10 forked — same set P12's approve-queue
+    surfaces as `channels`). Fall back to the scalar `products.channel`, then to the channel just
+    published, so a single-channel product behaves exactly as the prior MVP did."""
+    meta = product.get("metadata") or {}
+    blocks = meta.get("listings") or {}
+    chans = {c for c in blocks if c in _VALID_CHANNELS}
+    if chans:
+        return chans
+    if product.get("channel"):
+        return {product["channel"]}
+    return {fallback_channel}
+
+
+def _live_channels(product_id: str) -> set[str]:
+    """Channels that already have a `live` listings row for this product."""
+    rows = supabase_client.select(LISTINGS, {"product_id": product_id})
+    return {r["channel"] for r in rows if r.get("status") == "live"}
 
 
 def _existing_row(product_id: str, channel: str, external_id: str) -> dict[str, Any] | None:
@@ -101,12 +125,18 @@ def record_publish(
     inserted = supabase_client.insert(LISTINGS, row)
     listing = inserted[0] if inserted else row
 
-    # On a successful live publish, advance the product (single-channel MVP rule, see module docs).
+    # Advance the product to 'published' only once EVERY intended channel is live (SPEC-P16
+    # partial-multi-channel edge). The just-inserted row is already persisted, so it counts.
     product_status = None
-    if status == "live" and channel in _AUTO_PUBLISH_CHANNELS:
-        supabase_client.update(
-            PRODUCTS, {"id": product_id}, {"status": "published", "updated_at": _now_iso()}
-        )
-        product_status = "published"
+    if status == "live":
+        prows = supabase_client.select(PRODUCTS, {"id": product_id})
+        product = prows[0] if prows else {}
+        current = product.get("status")
+        intended = _intended_channels(product, channel)
+        if intended <= _live_channels(product_id) and current not in ("published", "retired"):
+            supabase_client.update(
+                PRODUCTS, {"id": product_id}, {"status": "published", "updated_at": _now_iso()}
+            )
+            product_status = "published"
 
     return {"ok": True, "created": True, "listing": listing, "product_status": product_status}
