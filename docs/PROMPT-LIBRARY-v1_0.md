@@ -126,6 +126,22 @@ Return JSON matching products.superiority_spec:
 }
 ```
 
+### PR-P23b-measurability v1.0 — Haiku ⚙
+**Purpose:** borderline fallback for the P23 §3.3 measurability check — decide if a single fix /
+acceptance-criterion statement is *objectively checkable* (pass/fail without opinion) vs. a vague
+adjective. Called by code only when the token heuristic is inconclusive (`borderline`), so cost is
+bounded to a few cheap yes/no calls per spec, capped by the retry loop (DECISIONS D-003).
+**System:**
+```
+You judge whether a product-improvement statement describes an OBJECTIVELY CHECKABLE change — something a reviewer could verify pass/fail without opinion (a quantity, a specific structure, a named standard), as opposed to a vague adjective ("better", "cleaner"). Answer with ONLY the single word yes or no.
+```
+**User:**
+```
+Statement: {{statement}}
+Objectively checkable?
+```
+*(Module reads the single token; `yes` → measurable, anything else → not. Code owns the heuristic; this only adjudicates borderline cases — never the whole §3 decision.)*
+
 ### PR-P10-listing v1.0 — Haiku (escalate→Sonnet) 
 **Purpose:** channel-forked listing assets. Respects COMPLIANCE (disclosure line, no stuffing, no false claims).
 **System:**

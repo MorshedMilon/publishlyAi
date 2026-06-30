@@ -1,0 +1,149 @@
+# P23 Superiority Spec config (SPEC-P23 Thresholds + QUALITY-STANDARDS §3 standards).
+# Operative values live here, not in code, so the spec bar can be tuned without edits.
+# QUALITY-STANDARDS §3 is the source of truth for min_weaknesses; threshold changes are a
+# DECISIONS action (CLAUDE §8.2), never a quiet edit.
+
+# A spec needs at least this many distinct, evidenced, measurable weaknesses (QUALITY-STANDARDS §3).
+min_weaknesses: 2
+
+# Regenerate a failing spec at most this many times (feeding failure reasons back) before
+# flagging the niche for a human — never write a weak contract (SPEC-P23 step 4).
+max_spec_retries: 2
+
+# Anti-fabrication grounding: a weakness's complaint must trace to real P05 evidence. Same
+# token-overlap params as the P05 miner (config/mining/mining.yaml) so the guard is calibrated
+# identically — a complaint P05 grounded re-matches here (symmetry is the correctness argument).
+evidence:
+  match_ratio: 0.5
+  min_shared: 2
+
+# §3.1 — a generic target_buyer ("everyone") is not a specific segment. Reject on any of these
+# tokens (substring scan of the lowercased buyer). Tune as generic phrasings recur.
+generic_buyer_stoplist:
+  - everyone
+  - anyone
+  - everybody
+  - anybody
+  - "people"
+  - all people
+  - someone
+  - somebody
+  - the masses
+  - general public
+  - users
+  - customers
+  - shoppers
+  - buyers in general
+
+# §3.3 — a fix / acceptance criterion is MEASURABLE when it names an objectively checkable change.
+# Three-way classification (validators.classify_measurable):
+#   objective token present            -> measurable
+#   vague adjective and NO objective   -> vague (reject)
+#   neither                            -> borderline (escalate to PR-P23b Haiku check)
+measurability:
+  objective_tokens:
+    # quantities / structure
+    - "<="
+    - ">="
+    - " x "
+    - per
+    - page
+    - pages
+    - section
+    - sections
+    - block
+    - blocks
+    - column
+    - columns
+    - grid
+    - line
+    - lines
+    - field
+    - fields
+    - prompt
+    - prompts
+    - day
+    - week
+    - month
+    - daily
+    - weekly
+    - monthly
+    - minute
+    - min
+    - point
+    - pt
+    - inch
+    - "\""
+    - mm
+    - cm
+    - dpi
+    - bleed
+    - trim
+    # named, checkable structures / standards
+    - am/pm
+    - "am / pm"
+    - wcag
+    - large-print
+    - large print
+    - single-sided
+    - single sided
+    - double-sided
+    - thick outline
+    - bold outline
+    - checkbox
+    - checkboxes
+    - table of contents
+    - index
+    - single
+    - one per
+    - two
+    - three
+    - four
+    - five
+  vague_adjectives:
+    - better
+    - nicer
+    - nice
+    - improved
+    - improve
+    - cleaner
+    - clean
+    - good
+    - great
+    - clear
+    - clearer
+    - easy to use
+    - user-friendly
+    - user friendly
+    - intuitive
+    - modern
+    - professional
+    - high quality
+    - high-quality
+    - premium
+    - beautiful
+    - attractive
+    - pleasant
+    - simple
+    - streamlined
+    - more usable
+    - well designed
+    - well-designed
+
+# NICHE-PLAYBOOK §5 differentiation levers, keyed on the EXACT P05 pattern archetypes
+# (config/mining/mining.yaml `patterns:` keys). The niche's dominant validated-weakness pattern
+# selects the lever the spec should reach for (SPEC-P23 step 3 — a soft signal, not a hard gate).
+levers:
+  type-too-small: large-print edition (oversized type, high-contrast)
+  cramped: time-blocked / AM-PM structure with purpose-built write space
+  paper-quality: print-spec fix (heavier paper note, single-sided to stop bleed)
+  overwhelming: single-focus / minimal version (fewer sections per page)
+  too-generic: hyper-specific-buyer framing
+  blank-intimidating: guided-not-blank (prompts instead of empty pages)
+  wrong-difficulty: bold-and-easy difficulty (thick outlines / right level)
+  missing-use-case: purpose-built fields matching the real workflow
+
+# Reproducibility (SPEC-P23 step 5) + routing.
+prompt_id: "PR-P23-superiority-spec v1.0"
+measurability_prompt_id: "PR-P23b-measurability v1.0"
+temperature: 0.2
