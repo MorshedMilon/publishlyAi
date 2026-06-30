@@ -33,6 +33,12 @@ class Settings:
     supabase_db_url: str
     anthropic_api_key: str | None
     niche_tool_export_dir: str
+    # Etsy Open API v3 credentials (SPEC-P13). Optional: only a real publish needs them, so config
+    # load never fails on their absence — the P13 acceptance test runs with an injected fake client.
+    etsy_api_key: str | None
+    etsy_oauth_token: str | None
+    etsy_refresh_token: str | None
+    etsy_shop_id: str | None
 
 
 def _load() -> Settings:
@@ -54,6 +60,10 @@ def _load() -> Settings:
         supabase_db_url=os.environ["SUPABASE_DB_URL"],
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
         niche_tool_export_dir=os.environ.get("NICHE_TOOL_EXPORT_DIR", "./input"),
+        etsy_api_key=os.environ.get("ETSY_API_KEY"),
+        etsy_oauth_token=os.environ.get("ETSY_OAUTH_TOKEN"),
+        etsy_refresh_token=os.environ.get("ETSY_REFRESH_TOKEN"),
+        etsy_shop_id=os.environ.get("ETSY_SHOP_ID"),
     )
 
 

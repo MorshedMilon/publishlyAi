@@ -1,0 +1,43 @@
+# P13 Etsy Publisher — operative values (SPEC-P13, CHANNEL-SPEC §4, COMPLIANCE §3/§9).
+# Field names verified against the Etsy Open API v3 reference (June 2026). "Code decides": the
+# orchestrator (pipeline/etsy_publisher/publisher.py) enforces the compliance gate, idempotency,
+# and the partial-upload/auth/rate-limit edge cases; the publishable values tune here, not in code
+# (CLAUDE §8.2). Credentials are NOT here — they live in .env (server-side only).
+
+# --- API endpoint (CHANNEL-SPEC §4) ---
+api_base: "https://api.etsy.com/v3/application"
+oauth_scopes: "listings_r listings_w"   # documentation note; token is minted out of band
+
+# --- Draft-listing fixed fields (createDraftListing; Etsy v3 reference) ---
+listing_type: "download"                 # digital download — no shipping profile required
+who_made: "i_did"                        # maps to "Designed by seller" (COMPLIANCE §3.2)
+when_made: "made_to_order"               # AI-assisted digital good, produced on demand
+is_supply: false                         # a finished product, not a craft supply
+taxonomy_id: 6844                         # Etsy "Digital Prints" taxonomy; adjust per product line
+default_quantity: 999                    # digital downloads sell unlimited copies
+default_price_usd: 7.0                   # fallback when the listing block carries no price
+
+# --- Activation (CHANNEL-SPEC §4 step 5; approval already happened at P12 §9.2) ---
+activate_on_publish: true
+
+# --- Channel constraints (CHANNEL-SPEC §4; re-checked here as the last gate before going live) ---
+max_tags: 13                             # up to 13 tags
+max_tag_chars: 20                        # each tag <= 20 chars
+
+# --- Compliance markers (COMPLIANCE §3.2/§3.3; mirrors config/listing/listing.yaml) ---
+required_attribute: "Designed by seller" # channel_fields.attributes.production_partner must equal this
+ai_flag_field: "ai_generative_used"      # the Etsy "I used AI-generative technology" checkbox flag
+disclosure_marker: "Designed by seller"  # must appear in the buyer-facing description (both §9 blocks end with it)
+banned_craft_phrases:                    # forbidden on AI products — never "handmade"/"made by hand"
+  - handmade
+  - hand made
+  - hand-made
+  - "made by hand"
+  - "made by"
+
+# --- AI-generative checkbox: no v3 API field exists, so P13 flags a one-step manual UI follow-up. ---
+edit_url_template: "https://www.etsy.com/your/shops/me/tools/listings/{listing_id}"
+
+# --- Rate-limit discipline (SPEC-P13 edge case: backoff/retry within limits) ---
+max_retries: 3                           # retries on HTTP 429 only
+backoff_seconds: 2                       # linear backoff: attempt * backoff_seconds
