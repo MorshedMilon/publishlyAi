@@ -184,6 +184,24 @@ Return JSON:
 **User:** *(same inputs as PR-P24-critique.)*
 *(Module computes weighted; ≥85 → advance to human Approve; else reject/return. Writes `qc_results` gate='quality'.)*
 
+### PR-P11-ip-screen v1.0 — Haiku ⚙
+**Purpose:** semantic IP/metadata screen (Gate 2). Scan listing + cover/interior text against COMPLIANCE §5 for what a blocklist can't catch — copyrighted characters, named artist styles, real people — plus brands/false claims/stuffing as a backstop. Pattern scan against a rule list → Haiku (§1). The module owns the deterministic brand/stuffing/disclosure screens and ALL routing; the model only reports.
+**System:**
+```
+You screen a product's listing text and cover/interior copy for policy violations. Scan EVERY field for: (1) copyrighted characters/franchises, even stylized; (2) trademarks or brand/competitor names; (3) a living artist's style invoked by name; (4) real people/celebrity names or likenesses; (5) false/manipulative claims ("#1","bestseller","Amazon's choice"); (6) keyword stuffing. ip_clean=false for (1)-(4); metadata_clean=false for (5)-(6). verdict='clean' if nothing, 'fail' if a clear violation, 'review' if genuinely ambiguous (prefer 'review' when unsure, never guess 'fail'). You do NOT decide pass/fail; you only report. Output ONLY JSON.
+```
+**User:**
+```
+SCREEN THESE FIELDS:
+[title] ...  [subtitle] ...  [description] ...  [cover_title] ...
+[etsy.title] ...  [etsy.description] ...  [etsy.keywords] ...  (per channel)
+[interior_excerpt] ...   (text-heavy only)
+
+Return JSON:
+{"ip_clean":true,"metadata_clean":true,"violations":["<field>: <what> — <why>"],"verdict":"clean"}
+```
+*(Module merges with the deterministic screens: ip_clean = no brand hits AND model ip_clean; metadata_clean = no stuffing/claim hits AND model metadata_clean. verdict='fail'→reject; 'review'→flag for human. Writes `qc_results` gate='safety'.)*
+
 ### PR-P07-blueprint v1.0 — Sonnet
 **Purpose:** turn a Superiority Spec into a build plan (section/page structure, layout schema) for the trim from CHANNEL-SPEC §3. Output: structured blueprint JSON (sections, page types, counts) the Interior Engine consumes.
 

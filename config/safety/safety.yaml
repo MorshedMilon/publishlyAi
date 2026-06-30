@@ -1,0 +1,98 @@
+# P11 Safety QC — operative values (SPEC-P11, COMPLIANCE §5/§6/§9/§10).
+# Gate 2: "is this allowed and original?" (CLAUDE §4.4). "LLM judges, code computes"
+# (PROMPT-LIBRARY §2.3): the model (PR-P11, Haiku) only flags semantic IP/metadata hits a
+# blocklist can't catch; every threshold and the pass/fail/flag decision live in code
+# (pipeline/safety/checks.py + safety_qc.py). Thresholds live here so the bar tunes without a
+# code edit (CLAUDE §8.2).
+
+# --- AI routing (PROMPT-LIBRARY §1: P11 = Haiku, pattern scan against a rule list) ---
+prompt_id: "PR-P11-ip-screen v1.0"
+model: "claude-haiku-4-5"
+temperature: 0.0                      # deterministic IP/metadata extraction (PROMPT-LIBRARY §2.5)
+
+# --- Originality (SPEC-P11 step 1 / Thresholds). Cosine over token-frequency vectors vs our own
+# published/approved catalog + the niche's known incumbents (COMPLIANCE §3.3 anti-near-duplicate). ---
+# flag_threshold      : cosine >= this -> too similar; grey band [flag, hard) routes to a human.
+# hard_originality_max : cosine >= this -> a near-clone of our own/an incumbent; hard fail.
+flag_threshold: 0.85
+hard_originality_max: 0.95
+
+# --- Low-content (SPEC-P11 step 2, COMPLIANCE §6). Only TEXT-HEAVY types flag below the word floor;
+# journals/planners/workbooks use the KDP low-content box and are never flagged here. Product type
+# is read from the product's niche (niches.product_type). ---
+min_word_count: 5000
+text_heavy_types:
+  - guide
+  - reference
+  - prompt_book
+  - prompt-book
+  - ebook
+  - workbook_text
+
+# --- Metadata hygiene + IP screens (COMPLIANCE §5; re-verifies P10's pre-checks on the refined
+# product). Mirrors config/listing/listing.yaml so the screens stay calibrated across modules
+# (P10 pre-checks at generation, P11 re-verifies at the gate). Keep these two lists in sync. ---
+max_token_repeats_per_field: 3        # any single significant token > this in one field = stuffing (§5.6)
+
+# Brand / competitor / trademark names -> ip_clean=false (§5.1/§5.2). Deterministic half of the IP
+# screen; the model (PR-P11) catches the rest (characters, artist styles, real people).
+brand_blocklist:
+  - amazon
+  - kindle
+  - etsy
+  - disney
+  - marvel
+  - nintendo
+  - pixar
+  - lego
+  - apple
+  - google
+# False / manipulative claims -> metadata_clean=false (§5.5).
+false_claims:
+  - "#1"
+  - "number one"
+  - bestseller
+  - best seller
+  - best-seller
+  - "amazon's choice"
+  - amazons choice
+  - top rated
+  - top-rated
+  - award winning
+  - award-winning
+  - guaranteed
+# Physical-craft phrasing forbidden on AI products -> metadata_clean=false (COMPLIANCE §3.2).
+banned_phrases:
+  - handmade
+  - hand made
+  - hand-made
+  - "made by"
+  - "made by hand"
+
+# --- Disclosure (SPEC-P11 step 5, COMPLIANCE §9). Mirror of listing.yaml so disclosure_complete
+# verifies exactly the blocks/placement P10 wrote. ---
+required_ai_disclosure_keys:          # products.ai_disclosure must carry these, each non-empty (DATA-SCHEMA §6.4)
+  - text
+  - cover
+  - interior_images
+  - translation
+disclosure_blocks:
+  etsy_minimal:
+    in_description: true
+    text: "Created using AI-assisted design tools and curated, refined, and quality-checked by me. Designed by seller."
+  etsy_extended:
+    in_description: true
+    text: "This product was created using AI-assisted tools to draft and design the content, then reviewed, edited, and verified by me before publishing. The structure, selection, and final quality are my own work. Designed by seller."
+  kdp_internal:
+    in_description: false
+    text: "AI-generated content declared in the KDP AI-Content section (text and cover)."
+channel_disclosure:
+  etsy: etsy_minimal
+  kdp: kdp_internal
+# Code-owned channel constants re-verified at the gate (must match what P10 wrote, listing.yaml).
+etsy_attribute: "Designed by seller"  # never "Made by"/"Handmade" (COMPLIANCE §3.2)
+etsy_ai_flag: "ai_generative_used"    # the Etsy "I used AI-generative technology" checkbox
+
+# --- EU AI Act label (COMPLIANCE §7). N/A for the typographic MVP; enable when photorealistic AI
+# covers ship into the EU (Article 50, from 2026-08-02). Gated off so the check is a no-op now. ---
+eu_photorealistic_label_check: false

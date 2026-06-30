@@ -2,6 +2,8 @@ supabase>=2.0
 python-dotenv>=1.0
 psycopg[binary]>=3.1
 pyyaml>=6.0
+# Anthropic SDK: the AI calls (P06/P10/P23/P24 and P11's PR-P11 IP screen) lazy-import this.
+anthropic>=0.40
 # P08 Interior Engine: HTML/CSS -> print PDF + PDF inspection (needs native GTK/Pango for WeasyPrint;
 # see .env.example WEASYPRINT_DLL_DIRECTORIES).
 weasyprint>=60
