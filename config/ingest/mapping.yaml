@@ -1,0 +1,51 @@
+# P04 Research Ingest — column-mapping config (SPEC-P04 Logic step 1).
+#
+# Each tool's CSV columns are mapped to `niches` fields here, NOT in code.
+# Swapping niche-research tools = edit this file, add a map, done.
+# A `null` field means "this export doesn't carry it" -> left null (or filled by
+# optional enrichment / the seed list). Legally-sourced exports only (CLAUDE §7.3).
+
+maps:
+  # Book Bolt product export: one row per incumbent product (ASIN).
+  bookbolt:
+    constants:
+      channel: kdp            # Book Bolt is an Amazon/KDP research tool
+    fields:
+      topic: Category
+      sub_niche: Keyword
+      product_type: Type
+      target_buyer: null      # not in the export
+      incumbent_id: ASIN
+      incumbent_title: Title
+      incumbent_bsr: BSR
+      incumbent_reviews: Reviews
+      price: Price
+      keywords: Keywords       # multi-value cell, split on | , ;
+
+  # eRank keyword export: one row per Etsy search keyword.
+  erank:
+    constants:
+      channel: etsy
+    fields:
+      topic: Category
+      sub_niche: Keyword
+      product_type: null
+      target_buyer: null
+      incumbent_id: null
+      incumbent_title: null
+      incumbent_bsr: null
+      incumbent_reviews: null
+      price: Average Price
+      keywords: Tags
+
+# Coarse BSR -> demand band (SPEC-P04 step 3). BSR is category-relative, so bands
+# are calibrated PER category — never one global threshold. Values are ascending
+# ceilings; the band stored is the smallest ceiling >= the strongest (lowest)
+# incumbent BSR. A BSR above every ceiling lands in an over-cap sentinel band.
+bsr_bands:
+  default: [5000, 20000, 50000, 100000, 250000, 500000]
+  planner: [3000, 12000, 35000, 80000, 200000]
+  journal: [3000, 12000, 35000, 80000, 200000]
+  logbook: [5000, 20000, 60000, 150000, 350000]
+  coloring: [4000, 15000, 45000, 120000, 300000]
+  puzzle: [4000, 15000, 45000, 120000, 300000]
