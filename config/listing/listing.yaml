@@ -1,0 +1,97 @@
+# P10 Listing Generator — operative values (SPEC-P10, CHANNEL-SPEC §4-§6, COMPLIANCE §5/§9).
+# "LLM proposes, code decides": the model (PR-P10) drafts listing copy; the channel limits,
+# compliance screens, disclosure injection and distinctness guard are enforced in code
+# (pipeline/listing/validators.py). Thresholds live here so the bar tunes without code edits
+# (CLAUDE §8.2). Adding/removing a fork channel is a YAML edit, not a code change (DECISIONS D-005).
+
+# --- Channel fork set (DECISIONS D-005): one master product row -> a listing per channel. ---
+# Uniform for every product at MVP. Extend to payhip/gumroad here when those publishers land.
+channels:
+  - etsy
+  - kdp
+
+# --- AI routing (PROMPT-LIBRARY §1/§5: P10 = Haiku, escalate -> Sonnet for long copy) ---
+prompt_id: "PR-P10-listing v1.0"
+model_haiku: "claude-haiku-4-5"
+model_sonnet: "claude-sonnet-4-6"
+temperature: 0.4                      # listing copy: low-moderate (PROMPT-LIBRARY §2.5)
+
+# --- Retry / escalation policy (failure-driven; bounds spend, CLAUDE §7.4) ---
+# Per channel: try Haiku, and after `haiku_attempts_before_escalate` failed Haiku tries escalate to
+# Sonnet for the remaining attempts. Worst case = max_attempts_per_channel calls/channel.
+max_attempts_per_channel: 3           # Haiku x1 + Sonnet x2 worst case
+haiku_attempts_before_escalate: 1     # one Haiku try, then escalate
+
+# --- Channel constraints (CHANNEL-SPEC §4-§6; enforced by validators.validate_listing) ---
+etsy:
+  max_tags: 13                        # up to 13 tags
+  max_tag_chars: 20                   # each tag <= 20 chars
+  attribute: "Designed by seller"     # code-authoritative; never "Made by"/"Handmade" (COMPLIANCE §3.2)
+  ai_flag: "ai_generative_used"       # the Etsy "I used AI-generative technology" checkbox (§3.1)
+kdp:
+  exact_keywords: 7                   # exactly 7 keywords
+  exact_categories: 2                 # exactly 2 browse categories
+  ai_declaration: "This work includes AI-generated content (text and cover)."  # KDP AI-Content note (§2.1)
+
+# --- COMPLIANCE §5 screens (pre-checked here, re-verified at P11). Lowercased substring scan. ---
+# Brand / competitor / trademark names — reject in any field (§5.1/§5.2). Seed with common
+# marketplace brands + recognizable franchises; extend as niches surface new ones.
+brand_blocklist:
+  - amazon
+  - kindle
+  - etsy
+  - disney
+  - marvel
+  - nintendo
+  - pixar
+  - lego
+  - apple
+  - google
+# False / manipulative claims — no fake rank/endorsement (§5.5).
+false_claims:
+  - "#1"
+  - "number one"
+  - bestseller
+  - best seller
+  - best-seller
+  - "amazon's choice"
+  - amazons choice
+  - top rated
+  - top-rated
+  - award winning
+  - award-winning
+  - guaranteed
+# Physical-craft phrasing forbidden on AI products (COMPLIANCE §3.2).
+banned_phrases:
+  - handmade
+  - hand made
+  - hand-made
+  - "made by"
+  - "made by hand"
+# Keyword stuffing: any single significant token appearing more than this many times WITHIN one
+# field is stuffing (COMPLIANCE §5.6). Counted per-field, never across the concatenated listing.
+max_token_repeats_per_field: 3
+
+# --- Distinctness (channel-fork rule, CLAUDE §5.1 / SPEC-P10): Etsy & KDP copy must differ. ---
+# Two channels' descriptions are "not distinct" if Jaccard token overlap >= this (or titles equal).
+# High threshold so genuinely different copy sharing niche vocabulary is not falsely rejected.
+distinctness_max_jaccard: 0.9
+
+# --- Disclosure blocks (COMPLIANCE §9 — single source of truth for text + placement) ---
+# `in_description: true` -> the line must appear in the buyer-facing description (digital channels).
+# `in_description: false` -> internal declaration only (KDP; no buyer-facing text, §2.5).
+disclosure_blocks:
+  etsy_minimal:
+    in_description: true
+    text: "Created using AI-assisted design tools and curated, refined, and quality-checked by me. Designed by seller."
+  etsy_extended:
+    in_description: true
+    text: "This product was created using AI-assisted tools to draft and design the content, then reviewed, edited, and verified by me before publishing. The structure, selection, and final quality are my own work. Designed by seller."
+  kdp_internal:
+    in_description: false
+    text: "AI-generated content declared in the KDP AI-Content section (text and cover)."
+
+# Which disclosure block each channel uses (default minimal for Etsy; internal for KDP).
+channel_disclosure:
+  etsy: etsy_minimal
+  kdp: kdp_internal

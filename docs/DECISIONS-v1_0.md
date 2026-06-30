@@ -101,3 +101,51 @@ floor is the §13-aligned move (surface discrepancies, don't proceed silently on
 
 **Hook.** CLAUDE §8.2 (thresholds in config, not code); SPEC-P07 Logic step 3 / Acceptance
 (page minimum + trim matches product_type); CHANNEL-SPEC §3 (trims), §6 (KDP ≥24).
+
+---
+
+## D-005 · 2026-06-30 · P10 · accepted — Channel-fork as per-channel listings on the master row; failure-driven Haiku→Sonnet; deterministic disclosure injection
+
+**Decision.** Four coupled choices for the Listing Generator:
+
+(a) **Uniform `[etsy, kdp]` fork set on the single master product row.** P10 generates a *distinct*
+listing per channel and stores them under `products.metadata.listings[<channel>]`, mirroring only the
+PRIMARY channel (`products.channel`, set by P04/P23) to the top-level `title/subtitle/description/
+keywords/categories` columns. The fork set is `config/listing/listing.yaml → channels`; adding
+payhip/gumroad is a YAML edit, no code change. This is the SPEC-P10 "single-master-product model"
+branch, consistent with D-001 (one channel-agnostic row per niche; channel-forked *assets* downstream).
+
+(b) **Per-channel settlement + flagging.** A channel that fails the §5 screens / channel limits after
+retries is flagged in `products.metadata.listings_flag[<channel>]` (not a scalar) while the other
+channels are still written. `_settled` = every fork channel is written OR flagged; a re-run fills only
+the gaps and never rewrites a succeeded channel. A flagged channel is settled (awaits a human, like
+D-002 / P08 / P09); a human re-enables it by clearing that channel's flag — exactly the P23 precedent.
+
+(c) **Failure-driven Haiku→Sonnet escalation.** PR-P10 runs on Haiku; after
+`haiku_attempts_before_escalate` failed tries the orchestrator escalates to Sonnet for the remaining
+attempts of *that channel only* (`max_attempts_per_channel` ceiling, default 3 → 6 LLM calls/product
+worst-case, ~2 normal). Same registered prompt, only the model id changes — no new PROMPT-LIBRARY
+entry. Sonnet is spent only where Haiku demonstrably failed.
+
+(d) **Deterministic disclosure injection.** SPEC-P10 Edge says "disclosure line missing → reject and
+regenerate." We instead **append** the code-owned disclosure line (from the COMPLIANCE §9 block in
+config) in `autofix` before validating. This is strictly *more* compliant (presence is guaranteed,
+not hoped for) and cheaper than an LLM re-roll that might still omit it — the line is a constant the
+code owns, like the Etsy "Designed by seller" attribute. KDP carries NO buyer-facing line (COMPLIANCE
+§2.5); its AI involvement is recorded as an internal `ai_declaration` note + `products.ai_disclosure`.
+
+**Rationale.** The channel-fork rule (CLAUDE §5.1) makes per-channel the natural unit; a scalar
+product-level flag/settle (P08's shape) would either re-bill the API for already-good channels every
+run or strand a recoverable one. Failure-driven escalation honours "cheapest model that clears the
+bar" (CLAUDE §7.1) and the ~$20–60/mo target (§7.4). Deterministic injection follows "LLM proposes,
+code decides" (PROMPT-LIBRARY §2.3): a code-owned constant is repaired in code, not regenerated.
+
+**Rejected.** (a) Per-channel product rows at P10 — multiplies rows + duplicates the channel-agnostic
+spec, contradicts D-001. (b) Product-level flag/settle — the re-bill / strand failure above. (c)
+Up-front length-heuristic escalation — guesses; over- or under-spends vs. escalating on real failure.
+(d) Regenerate-on-missing-disclosure — burns a call and risks the model also drifting on title/tags,
+for a string the code already owns.
+
+**Hook.** CLAUDE §5.1 (fork per channel), §7.1/§7.4 (model routing + cost), §8.1/§8.2 (durable
+per-channel state, additive jsonb — no migration), §13 (disclosure always present); SPEC-P10
+(Outputs, Logic, Edge cases); COMPLIANCE §5/§9, §2.5; DATA-SCHEMA §4.2/§6.4; D-001, D-002.
