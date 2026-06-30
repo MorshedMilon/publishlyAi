@@ -1,0 +1,92 @@
+# P08 Interior Engine — operative values (SPEC-P08, CHANNEL-SPEC §2-§3).
+# Code-authoritative: the page geometry, fonts, palette and type scale here are emitted by
+# pipeline/interior (assemble.py + base_print.css) — the LLM only fills section bodies, never
+# the trim/bleed/fonts/margins. Design system adapted from TRAVELLYAI_DESIGN.md (teal+gold
+# IslamicInfo family) for print.
+
+# --- AI routing (PROMPT-LIBRARY §1/§5: interiors = Sonnet, volume drafting into HTML/CSS) ---
+prompt_id: "PR-P08-interior v1.0"
+model: "claude-sonnet-4-6"
+temperature: 0.4
+max_interior_retries: 1          # initial section gen + 1 retry on unusable output, then skip
+
+# --- Render + validation thresholds (CHANNEL-SPEC §2) ---
+render:
+  dpi: 300
+  output_dir: "build/interiors"  # interior PDFs land here; interior_path stores the repo-relative path
+  bleed_in: 0.125                # 3.2mm on each outside edge (full-bleed page)
+  min_image_dpi: 300            # placed raster images must clear this at final size
+  trim_tolerance_pt: 2.0        # MediaBox dimension tolerance (1pt = 1/72in)
+  # Content margins measured FROM THE TRIM edge (the bleed is added outside these in code).
+  margin_top_in: 0.5
+  margin_bottom_in: 0.6          # extra room for the running page-number footer
+  margin_outside_in: 0.5
+  # Inside/gutter margin scales with total page count (KDP binding allowance, CHANNEL-SPEC §2).
+  # First band whose max_pages >= total wins.
+  gutter_bands:
+    - {max_pages: 150, inside_in: 0.375}
+    - {max_pages: 300, inside_in: 0.5}
+    - {max_pages: 500, inside_in: 0.625}
+    - {max_pages: 700, inside_in: 0.75}
+    - {max_pages: 100000, inside_in: 0.875}
+  # Crop marks only where a channel needs them. KDP: none (it trims from a full-bleed page).
+  marks_by_channel:
+    kdp: none
+    etsy: none
+    payhip: none
+    gumroad: none
+
+# --- Fonts (SIL OFL, embedded via @font-face — never system fonts, CHANNEL-SPEC §2) ---
+# Only RIBBI faces are used: each family resolves under ONE internal family name with standard
+# weight/style, so WeasyPrint embeds them reliably (the separate-family Medium/SemiBold static
+# instances silently fall back to a system font, so they are intentionally excluded).
+fonts:
+  dir: "assets/fonts"
+  faces:
+    - {family: "Cormorant Garamond", weight: normal, style: normal, file: "CormorantGaramond-Regular.ttf"}
+    - {family: "Cormorant Garamond", weight: normal, style: italic, file: "CormorantGaramond-Italic.ttf"}
+    - {family: "Cormorant Garamond", weight: bold,   style: normal, file: "CormorantGaramond-Bold.ttf"}
+    - {family: "Cormorant Garamond", weight: bold,   style: italic, file: "CormorantGaramond-BoldItalic.ttf"}
+    - {family: "Inter", weight: normal, style: normal, file: "Inter-Regular.ttf"}
+    - {family: "Inter", weight: normal, style: italic, file: "Inter-Italic.ttf"}
+    - {family: "Inter", weight: bold,   style: normal, file: "Inter-Bold.ttf"}
+    - {family: "Inter", weight: bold,   style: italic, file: "Inter-BoldItalic.ttf"}
+    - {family: "JetBrains Mono", weight: normal, style: normal, file: "JetBrainsMono-Regular.ttf"}
+    - {family: "JetBrains Mono", weight: bold,   style: normal, file: "JetBrainsMono-Bold.ttf"}
+  # Semantic roles -> family (TRAVELLYAI_DESIGN §3.1).
+  serif: "Cormorant Garamond"    # headings, page/section titles, gold-italic emphasis
+  sans:  "Inter"                 # body, labels, eyebrows, UI
+  mono:  "JetBrains Mono"        # dates, times, durations, numerics
+
+# --- Palette (TRAVELLYAI_DESIGN §2, print-safe usage; gold-700 for any gold TEXT on white) ---
+palette:
+  teal_900: "#0F2A2C"            # headings / ink-900
+  teal_800: "#003F44"
+  teal_700: "#00696E"            # PRIMARY brand teal (rules, accents, eyebrows)
+  teal_50:  "#EAF5F5"            # soft tint fills
+  gold_700: "#9A7C3F"            # gold TEXT on white (emphasis em)
+  gold_500: "#C5A059"            # gold rules / fills only (not body text on white)
+  ink_900:  "#0F2A2C"
+  ink_700:  "#243738"
+  ink_500:  "#3D494A"           # body text
+  ink_400:  "#6D797A"           # captions / secondary
+  ink_300:  "#9DA8A9"           # dividers
+  ink_200:  "#D4DCDC"          # hairline rules
+  ink_100:  "#EEF2F2"           # faint track fills
+  terracotta: "#C77F4E"         # accent: food/adventure (one category)
+  sage: "#7DA08A"               # accent: nature/wellness (one category)
+  white: "#FFFFFF"
+
+# --- Type scale in PRINT points (adapted from TRAVELLYAI_DESIGN §3.2 px screen scale) ---
+# Defaults only. A section may raise a size to satisfy a measurable acceptance criterion
+# (e.g. "body font >= 14pt") — the generator is told the criteria verbatim.
+type_scale:
+  h1_pt: 22                      # page / section title (Cormorant bold)
+  h2_pt: 15
+  h3_pt: 12
+  body_pt: 11                    # Inter
+  body_line: 1.5
+  label_pt: 9                    # eyebrow: Inter bold, UPPERCASE, tracked 0.16em, teal
+  label_tracking_em: 0.16
+  mono_pt: 10
+  hairline_pt: 0.5               # print-safe minimum rule weight (TRAVELLYAI 0.5px -> 0.5pt)

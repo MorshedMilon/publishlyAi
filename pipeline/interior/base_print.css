@@ -1,0 +1,121 @@
+/* P08 Interior Engine — base print stylesheet (code-authoritative design system).
+ *
+ * Adapted from TRAVELLYAI_DESIGN.md (teal+gold IslamicInfo family) for PRINT:
+ *   - screen-only constructs are dropped: glassmorphism/backdrop-filter, box-shadows,
+ *     hover/animation, dark surfaces. Interiors are light-first white writing pages.
+ *   - hairlines bumped from 0.5px to a print-safe 0.5pt; gold TEXT uses gold-700 (never
+ *     gold-500) on white per their §16; serif headings carry a gold-italic <em>.
+ *
+ * Colour, type-scale and font tokens come from config/interior/interior.yaml — assemble.py
+ * emits the :root{}, @font-face and @page blocks before this file, so everything here is
+ * var()-driven (single source of truth = the YAML). The LLM only fills section bodies and may
+ * reuse the class vocabulary below; it never sets fonts, trim, bleed or margins. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-family: var(--font-sans); }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--body);
+  line-height: var(--body-line);
+  color: var(--c-ink-500);
+  background: var(--c-white);
+  -weasy-hyphens: none;
+}
+
+/* --- Page wrapper: assemble.py emits one .page per physical page and forces the breaks. --- */
+.page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  break-inside: avoid;
+}
+
+/* --- Headings: Cormorant serif, teal ink, gold-italic emphasis (the signature). --- */
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  font-weight: bold;
+  color: var(--c-teal-900);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+h1 { font-size: var(--h1); margin-bottom: 6pt; }
+h2 { font-size: var(--h2); margin-bottom: 5pt; }
+h3 { font-size: var(--h3); margin-bottom: 4pt; }
+h1 em, h2 em, h3 em, h4 em, .em-gold {
+  font-style: italic;
+  font-weight: bold;
+  color: var(--c-gold-700);
+}
+
+p { margin-bottom: var(--body); }
+strong, b { font-weight: bold; color: var(--c-ink-700); }
+em, i { font-style: italic; }
+
+/* --- Eyebrow / micro labels: tracked uppercase Inter in brand teal (TRAVELLYAI §3.2). --- */
+.eyebrow, .label {
+  font-family: var(--font-sans);
+  font-weight: bold;
+  font-size: var(--label);
+  text-transform: uppercase;
+  letter-spacing: var(--label-track);
+  color: var(--c-teal-700);
+}
+.muted { color: var(--c-ink-400); }
+
+/* --- Numerics: dates, times, durations, page numbers (TRAVELLYAI rule 7). --- */
+.mono, time, .num {
+  font-family: var(--font-mono);
+  font-size: var(--mono);
+}
+
+/* --- Rules / dividers: print-safe hairline in the ink ramp; gold/teal accent variants. --- */
+hr, .rule {
+  border: none;
+  border-top: var(--hairline) solid var(--c-ink-200);
+  margin: 8pt 0;
+}
+.rule-gold { border-top: var(--hairline) solid var(--c-gold-500); }
+.rule-teal { border-top: var(--hairline) solid var(--c-teal-700); }
+
+/* --- Writing surfaces: ruled lines for journaling/notes (no shadow, light-first). --- */
+.writeline { border-bottom: var(--hairline) solid var(--c-ink-200); height: 22pt; }
+.writeline.tight { height: 16pt; }
+.lines > .writeline:last-child { border-bottom: none; }
+
+/* --- Fields: a label above a writing line. --- */
+.field { margin-bottom: 8pt; }
+.field > .label { display: block; margin-bottom: 4pt; }
+.field > .writeline { height: 20pt; }
+
+/* --- Checkbox rows (habits, to-dos): square outline + label, no fill. --- */
+.check { display: flex; align-items: baseline; gap: 8pt; margin-bottom: 6pt; }
+.check::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 11pt; height: 11pt;
+  border: var(--hairline) solid var(--c-ink-300);
+  border-radius: 2pt;
+}
+
+/* --- Boxes / panels: hairline-bordered cards for worksheet sections (flat, on-brand). --- */
+.box {
+  border: var(--hairline) solid var(--c-ink-200);
+  border-radius: 8pt;
+  padding: 10pt 12pt;
+}
+.box-tint { background: var(--c-teal-50); border-color: var(--c-teal-50); }
+
+/* --- Section layout helpers. Keep <= 3 stacked sections per page for low-stimulation
+ *     layouts; .am-pm gives the two-column AM/PM split planners need. --- */
+.stack > * + * { margin-top: 10pt; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; }
+.am-pm { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; }
+.am-pm .col .label { display: block; margin-bottom: 6pt; }
+
+/* Accent text colours, used sparingly per category (TRAVELLYAI §2.2). */
+.c-teal { color: var(--c-teal-700); }
+.c-gold { color: var(--c-gold-700); }
+.c-terracotta { color: var(--c-terracotta); }
+.c-sage { color: var(--c-sage); }

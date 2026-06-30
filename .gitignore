@@ -3,6 +3,7 @@
 
 # generated assets
 output/
+build/
 
 # python
 __pycache__/

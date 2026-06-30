@@ -2,3 +2,9 @@ supabase>=2.0
 python-dotenv>=1.0
 psycopg[binary]>=3.1
 pyyaml>=6.0
+# P08 Interior Engine: HTML/CSS -> print PDF + PDF inspection (needs native GTK/Pango for WeasyPrint;
+# see .env.example WEASYPRINT_DLL_DIRECTORIES).
+weasyprint>=60
+pikepdf>=8
+pypdf>=4
+pillow>=10
