@@ -1,0 +1,38 @@
+# P24 Refinement Engine config (SPEC-P24 + QUALITY-STANDARDS §4 rubric).
+# Operative values live here, not in code, so the rubric can be tuned without edits.
+# QUALITY-STANDARDS §4 is the source of truth for the weights and the 85 bar; threshold changes
+# are a DECISIONS action (CLAUDE §8.2), never a quiet edit.
+
+# §4 rubric weights — MUST sum to 1.0 (validators.load_config enforces it). Differentiation carries
+# the most weight: an undelivered promise alone can sink the product below 85 (intentional).
+weights:
+  differentiation: 0.35
+  design: 0.20
+  usability: 0.20
+  completeness: 0.15
+  value: 0.10
+
+# The absolute quality bar (QUALITY-STANDARDS §4). NEVER relaxed to clear a backlog (SPEC-P24).
+pass_bar: 85
+
+# A dimension scoring below this floor is "deficient" and is regenerated; others are left untouched
+# (targeted regeneration only — cost + avoids regressing the good parts, QUALITY-STANDARDS §5).
+gap_floor: 0.85
+
+# Hard iteration cap (QUALITY-STANDARDS §5). After this many regeneration passes still < 85, stop,
+# keep the best version, flag for a human — never loop forever, never auto-pass.
+max_iterations: 3
+
+# SPEC-P24 mapping: which engine regenerates each deficient dimension. Differentiation/completeness/
+# usability are interior content (P08); design is the cover (P09, deterministic) + interior tweaks;
+# value is the listing copy (P10). Targets are de-duplicated per pass before regeneration runs.
+regen_targets:
+  differentiation: [interior]
+  completeness: [interior]
+  usability: [interior]
+  design: [cover, interior]
+  value: [listing]
+
+# Reproducibility + routing (PROMPT-LIBRARY §1): critique = Opus, regeneration = Sonnet.
+prompt_id: "PR-P24-critique v1.0"
+temperature: 0.2
