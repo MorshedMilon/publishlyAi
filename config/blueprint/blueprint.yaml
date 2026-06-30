@@ -1,0 +1,43 @@
+# P07 Blueprint config (SPEC-P07 Logic/Acceptance + CHANNEL-SPEC §3 trims, §6 page floor).
+# Operative values live here, not in code, so the build bar can be tuned without edits.
+# Threshold changes are a DECISIONS action (CLAUDE §8.2), never a quiet edit.
+
+# Trim/format by product_type (CHANNEL-SPEC §3). Code is authoritative on trim — it picks the
+# trim from product_type and *tells* the LLM; the LLM never decides it. So "trim matches
+# product_type" (SPEC-P07 Acceptance) holds by construction.
+trim_defaults:
+  planner:   {trim: "6x9",     format: print,   single_sided: false}
+  journal:   {trim: "6x9",     format: print,   single_sided: false}
+  logbook:   {trim: "6x9",     format: print,   single_sided: false}
+  workbook:  {trim: "8.5x11",  format: print,   single_sided: false}
+  coloring:  {trim: "8.5x8.5", format: print,   single_sided: true}   # single-sided so color doesn't bleed through
+  activity:  {trim: "8.5x11",  format: print,   single_sided: false}
+  printable: {trim: "8.5x11",  format: digital, single_sided: false}
+
+# Minimum total page count by channel + product_type (SPEC-P07 Logic step 3 / Validate).
+# KDP 24 is the only floor documented in CHANNEL-SPEC (§6 manual checklist); SPEC-P07 cites
+# "§2.4" which does not exist (see DECISIONS D-004). Digital-channel floors are tunable defaults.
+channel_minimums:
+  kdp:     {planner: 24, journal: 24, logbook: 24, workbook: 24, coloring: 24, activity: 24}
+  etsy:    {planner: 20, journal: 20, logbook: 20, workbook: 20, coloring: 20, activity: 20, printable: 1}
+  payhip:  {planner: 20, journal: 20, logbook: 20, workbook: 20, coloring: 20, activity: 20, printable: 1}
+  gumroad: {planner: 20, journal: 20, logbook: 20, workbook: 20, coloring: 20, activity: 20, printable: 1}
+
+# Criterion-coverage token-overlap fallback (reuses pipeline/mining/text.supports). A criterion is
+# "satisfied" by a section if that section copied it verbatim OR the section's claimed criterion
+# shares >= match_ratio of the spec criterion's significant tokens AND >= min_shared of them.
+# Stricter than P05/P23 (0.5) so a section can't claim coverage of a criterion it barely overlaps.
+coverage:
+  match_ratio: 0.6
+  min_shared: 2
+
+# Regenerate a blueprint that fails the code checks at most this many times (feeding the failure
+# reasons back) before flagging the product for a human — never write a contract-violating
+# blueprint (SPEC-P07 Edge cases).
+max_blueprint_retries: 2
+
+# Structured planning — warmer than P06/P23's 0.2 (some structural creativity), well below creative.
+temperature: 0.4
+
+# Reproducibility + routing (PROMPT-LIBRARY §1: Blueprint = Sonnet).
+prompt_id: "PR-P07-blueprint v1.0"

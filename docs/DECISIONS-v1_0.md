@@ -73,3 +73,31 @@ Haiku cost buys real precision where it matters. (Owner chose the fallback over 
 
 **Hook.** CLAUDE §7.3 (paid AI call justified here), §7.4 (cost target); PROMPT-LIBRARY §6
 (register before use); SPEC-P23 Thresholds (`measurability_check`: token heuristic + optional Haiku).
+
+---
+
+## D-004 · 2026-06-29 · P07 · accepted — Blueprint page minimums via config; trim is code-authoritative
+
+**Decision.** P07's page-count gate reads minimums from `config/blueprint/blueprint.yaml`
+(`channel_minimums[channel][product_type]`), seeded with **KDP = 24** — the only page floor actually
+documented in CHANNEL-SPEC (§6 KDP manual checklist). Digital-channel floors (Etsy/Payhip/Gumroad)
+are tunable defaults. Separately, **trim is chosen in code** from `product_type` per CHANNEL-SPEC §3
+(`trim_defaults`) and injected into the prompt; the LLM is told the trim, never trusted to pick it,
+so "trim matches `product_type`" (SPEC-P07 Acceptance) holds by construction.
+
+**Rationale.** SPEC-P07 Logic step 3 cites "CHANNEL-SPEC §2.4" for the page minimum, but **§2.4 does
+not exist** — CHANNEL-SPEC §2 has no numbered sub-clauses and the lone concrete floor is the KDP ≥24
+in §6. Config-driving the value keeps the threshold tunable without code edits (CLAUDE §8.2 pattern,
+mirroring `validation.yaml`/`superiority.yaml`) and lets per-channel floors diverge (a digital
+printable is not bound by KDP's 24-page print floor). Code-authoritative trim removes a whole class
+of LLM error (wrong/missing trim) and makes the validator's trim check a cheap guard rather than a
+failure mode.
+
+**Rejected.** (a) Hard-coding 24 in P07 — buries a tunable threshold in code, can't vary by channel.
+(b) Letting the LLM emit the trim and validating it — adds a retry path for a value that is fully
+determined by `product_type`, wasting Sonnet calls. (c) Treating the §2.4 citation as authoritative
+and blocking — the section is absent; surfacing the gap here and resolving to the documented KDP
+floor is the §13-aligned move (surface discrepancies, don't proceed silently on a phantom spec).
+
+**Hook.** CLAUDE §8.2 (thresholds in config, not code); SPEC-P07 Logic step 3 / Acceptance
+(page minimum + trim matches product_type); CHANNEL-SPEC §3 (trims), §6 (KDP ≥24).
