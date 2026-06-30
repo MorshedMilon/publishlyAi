@@ -1,0 +1,28 @@
+# P25 Quality Gate config (SPEC-P25 + QUALITY-STANDARDS §4 rubric, §6 gate rules).
+# Operative values live here, not in code, so the bar can be audited without edits. QUALITY-STANDARDS
+# §4 is the source of truth for the weights and the 85 bar; a threshold change is a DECISIONS action
+# (CLAUDE §8.2), never a quiet edit, and the 85 bar is NEVER relaxed to clear a backlog (SPEC-P25).
+
+# §4 rubric weights — MUST sum to 1.0 (validators.load_config enforces it). Identical to P24's rubric:
+# one rubric, used twice (QUALITY-STANDARDS §4) — P24 iterates toward it, P25 confirms it afresh.
+# Differentiation carries the most weight: an unmet acceptance criterion alone can sink it below 85
+# (intentional — the differentiation IS the product, SPEC-P25).
+weights:
+  differentiation: 0.35
+  design: 0.20
+  usability: 0.20
+  completeness: 0.15
+  value: 0.10
+
+# The absolute quality bar (QUALITY-STANDARDS §4/§8). passed = quality_score >= 85. Deterministic on >=.
+pass_bar: 85
+
+# Refine budget (QUALITY-STANDARDS §5). On a <85 verdict, return to P24 only while
+# products.refine_iterations < this cap; at the cap, reject + flag a human (prevents P24<->P25 ping-pong).
+max_iterations: 3
+
+# Routing (PROMPT-LIBRARY §1): independent superiority judgment runs on Opus — the heaviest production
+# model, appropriate for this high-stakes gate. The judge scores afresh, ignoring P24's prior score.
+prompt_id: "PR-P25-quality-gate v1.0"
+model: "claude-opus-4-8"
+temperature: 0.2
