@@ -1,0 +1,68 @@
+# P09 Cover Engine — operative values (SPEC-P09, CHANNEL-SPEC §2/§6).
+# Code-authoritative & deterministic: pipeline/cover (compose.py + cover.css) emits the cover
+# geometry, panels, motif and title block — there is NO LLM and NO AI illustration at MVP
+# (that is P19). Fonts / palette / type_scale are NOT duplicated here: the loader splices them in
+# from config/interior/interior.yaml so the brand design system stays unified with P08.
+
+# --- Render + validation thresholds (CHANNEL-SPEC §2) ---
+render:
+  dpi: 300
+  output_dir: "build/covers"      # cover assets land here; cover_path stores the repo-relative path
+  bleed_in: 0.125                  # 3.2mm on each outside edge of the wraparound (KDP full-bleed)
+  min_image_dpi: 300               # any placed raster (motifs are vector, so usually none) must clear this
+  trim_tolerance_pt: 2.0           # MediaBox dimension tolerance (1pt = 1/72in)
+  digital_raster_dpi: 300          # front-cover PNG raster resolution for digital channels
+
+# --- KDP spine geometry (CHANNEL-SPEC §6 — spine = f(page_count, paper)) ---
+# Per-page caliper in inches, from KDP's published cover-calculator values. Paper stock is
+# per-product later: read metadata.blueprint.paper if present, else default_stock here.
+paper:
+  default_stock: "white"
+  thickness_in_per_page:
+    white: 0.002252                # black ink on white (standard low-content default)
+    cream: 0.0025                  # black ink on cream
+    color_standard: 0.002252       # standard colour
+    premium_color: 0.002347        # premium colour
+
+spine:
+  text_min_pages: 100              # KDP only allows spine TEXT at >=100 pages; below this, omit it
+  safety_margin_in: 0.0625         # keep spine text >=1/16in clear of the fold (KDP)
+  min_text_width_in: 0.20          # below this the spine is too thin to set legible text
+
+# --- Author / imprint line (no DB field stores this; single editable default, CLAUDE §11 brand) ---
+brand:
+  name: "Noor & Quill"             # <-- EDIT to your imprint name; prints on front + back
+
+# --- Title block: deterministic auto-fit keeps the title legible (the #1 priority, SPEC-P09) ---
+title:
+  max_pt: 46                       # start size; step down until it fits the front panel
+  min_pt: 24                       # never smaller — below this we let it wrap / flag overflow
+  max_lines: 3
+  subtitle_pt: 15
+  brand_pt: 12
+
+# --- Motif library (pure CSS/SVG, vector => no DPI risk). Selected per niche/product_type. ---
+# A topic keyword match wins first (faith niches -> geometric), else product_type, else default.
+motifs:
+  default: "framed"
+  by_product_type:
+    planner: "gradient"
+    journal: "framed"
+    logbook: "framed"
+    workbook: "gradient"
+    coloring: "minimal"
+    activity: "minimal"
+  by_topic_keyword:                # substring match on niche topic/sub_niche (lowercased)
+    islamic: "geometric"
+    ramadan: "geometric"
+    quran: "geometric"
+    hifz: "geometric"
+    dua: "geometric"
+    muslim: "geometric"
+
+# --- Digital previews (Etsy/Payhip/Gumroad): >=1 mockup, composited from the REAL front only ---
+# (COMPLIANCE §4.2: a mockup must never show anything the file does not deliver.)
+digital:
+  mockups:
+    - "flat_shadow"                # front on a branded backdrop with a soft drop shadow
+  backdrop_hex: "#EAF5F5"          # teal_50 tint backdrop
