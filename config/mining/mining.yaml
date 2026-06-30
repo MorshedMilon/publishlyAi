@@ -1,0 +1,59 @@
+# P05 Review-Pain Miner config (SPEC-P05 Thresholds + §2 pattern lens).
+# Thresholds and stop-lists live here, not in code, so they can be tuned without edits.
+
+thresholds:
+  # A complaint is promoted to a pain_point only if it recurs in >=N reviews OR
+  # across >=M incumbents (SPEC-P05 Thresholds: min_evidence_for_painpoint).
+  min_evidence_reviews: 3
+  min_evidence_incumbents: 2
+  # Keep the strongest few; more dilutes the Superiority Spec (P23).
+  max_painpoints_per_niche: 5
+  # Below this, an incumbent's signal is low-confidence (flagged, not suppressed).
+  min_reviews_to_mine: 5
+
+matching:
+  # A review supports a complaint when it shares >= match_ratio of the complaint's
+  # significant tokens AND at least min_shared_tokens of them (capped at the
+  # complaint's length). This is the code-side grounding + hallucination guard:
+  # a complaint with zero supporting reviews is dropped (never invented — §Edge).
+  match_ratio: 0.5
+  min_shared_tokens: 2
+
+# Non-actionable complaints — dropped before grounding (SPEC-P05 step 3).
+vague_stoplist:
+  - didn't like it
+  - dont like it
+  - not great
+  - meh
+  - disappointed
+  - waste of money
+  - wouldnt recommend
+  - one star
+  - love it
+  - great product
+  - not worth it
+
+# Off-topic gripes — not product weaknesses we can fix in the file (SPEC-P05 Edge).
+offtopic_stoplist:
+  - shipping
+  - arrived
+  - delivery
+  - postage
+  - packaging
+  - price
+  - expensive
+  - refund
+  - seller
+  - customer service
+
+# NICHE-PLAYBOOK §2 weakness archetypes. Each complaint is tagged with the first
+# archetype whose keyword appears in it (SPEC-P05 step 6). Stored for P06/P23 reuse.
+patterns:
+  type-too-small: [font, small, tiny, text size, hard to read, cant read, print too small, large print]
+  cramped: [room, space, cramped, tight, afternoon, no space, write more, more space]
+  paper-quality: [bleed, ink, paper, thin page, page quality, bleeds through, ghosting]
+  overwhelming: [overwhelming, busy, cluttered, too many, complicated, confusing, chaotic]
+  too-generic: [generic, anyone, plain, nothing special, basic, boring]
+  blank-intimidating: [blank, unguided, no prompt, intimidating, where to start, empty page]
+  wrong-difficulty: [too hard, too difficult, intricate, too easy, complex, advanced, beginner]
+  missing-use-case: [missing, doesnt have, no section, wish it had, lacks, needs a, would be nice, no place for]

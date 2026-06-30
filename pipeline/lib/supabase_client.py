@@ -45,3 +45,13 @@ def delete(table: str, match: dict[str, Any]) -> list[dict[str, Any]]:
     for key, value in match.items():
         query = query.eq(key, value)
     return query.execute().data
+
+
+def update(
+    table: str, match: dict[str, Any], values: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Update rows matching the equality filter, returning the updated record(s)."""
+    query = get_client().table(table).update(values)
+    for key, value in match.items():
+        query = query.eq(key, value)
+    return query.execute().data
