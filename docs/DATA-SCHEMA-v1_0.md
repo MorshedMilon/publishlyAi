@@ -19,6 +19,8 @@ niches (1) ──< (many) competitors        [benchmarked incumbents, monitored 
 
 Six tables: **niches** (discovery + validation), **products** (production through the funnel), **qc_results** (the two gates), **listings** (publish ledger), **tracking** (post-launch metrics), **competitors** (continuous benchmark monitoring).
 
+**Console control-plane (added by the Console build, §4.7–4.10):** **jobs** (the queue between the browser and the workers), **ai_suggestions** (operator-approved AI recommendations), **cron_jobs** (scheduled-run definitions), **versions** (append-only product edit log). These sit *beside* the funnel — they carry loose references (`target_id`, `product_id`) but do not gate it. Migration lives in `db/migrations/001_console_control_plane.sql`; the six tables above are unchanged except that RLS is enabled on all ten (the pipeline's service_role key bypasses RLS, so workers are unaffected).
+
 ---
 
 ## 2. Status state machines (legal transitions only)
@@ -47,6 +49,20 @@ pending → live → retired
    └────→ failed
 ```
 
+**job.status** (control plane; worker-driven, §4.7)
+```
+queued → running → succeeded
+                └→ failed
+queued → cancelled          (operator set cancel_requested before the worker claimed it)
+```
+- `queued` Console enqueued · `running` worker claimed + set `started_at` · `succeeded`/`failed` worker wrote `finished_at` + `result` · `cancelled` worker honored `cancel_requested` instead of running. The Console never assumes success — a pending row is labelled "requested", not "done".
+
+**ai_suggestion.status** (§4.8)
+```
+open → approved      (operator accepts → enqueues a jobs row; never auto-runs)
+open → dismissed
+```
+
 ---
 
 ## 3. Enums
@@ -58,6 +74,8 @@ create type product_status  as enum ('drafting','refining','qc_safety','qc_quali
 create type gate_type       as enum ('safety','quality');
 create type listing_status  as enum ('pending','live','failed','retired');
 ```
+
+The Console control-plane statuses (`jobs.status`, `ai_suggestions.status`) are **`text` + `CHECK`**, not enums — the Console spec specifies text and these lifecycles evolve more freely than the locked domain enums above. Allowed values are enforced by CHECK constraints in the migration (§4.7, §4.8).
 
 ---
 
@@ -168,6 +186,70 @@ One row per gate per product. `gate='safety'` populates the safety columns; `gat
 | review_themes | jsonb | clustered complaints (the weakness we exploit) |
 | weakness_still_open | boolean | false once they fix it → our edge erodes (flag it) |
 | last_checked | timestamptz | — |
+
+### 4.7 `jobs` — control-plane queue (Console → workers)
+
+The Console enqueues; workers poll for `queued` rows of their module, claim, run, and write status back. Status is `text` + CHECK (§3). Migration in `db/migrations/001_console_control_plane.sql`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | uuid PK | — |
+| module | text | `'P04'…'P26'` — which pipeline module to run |
+| target_id | uuid (nullable) | product / niche / opportunity the job acts on |
+| params | jsonb | optional args; `params.argv` is a list of CLI args (shape §6.6) |
+| status | text (CHECK) | `queued` \| `running` \| `succeeded` \| `failed` \| `cancelled` (§2) |
+| cancel_requested | boolean | UI writes this; the worker honors it before claiming |
+| requested_by | text | operator id (Supabase Auth) |
+| requested_at | timestamptz | when enqueued |
+| started_at | timestamptz (nullable) | worker-written when it claims the row |
+| finished_at | timestamptz (nullable) | worker-written when done |
+| result | jsonb (nullable) | worker-written summary / error (shape §6.7) |
+| created_at / updated_at | timestamptz | row lifecycle |
+
+### 4.8 `ai_suggestions` — operator-approved AI recommendations
+
+Approval never auto-executes; it enqueues a `jobs` row (§9 of the Console PRD). Consumed by U04 (product tab) and U09 (portfolio).
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | uuid PK | — |
+| scope | text (CHECK) | `product` or `portfolio` |
+| target_id | uuid (nullable) | product (scope=`product`) or null (scope=`portfolio`) |
+| kind | text | suggestion category (open-ended) |
+| body | jsonb | suggestion text / structured payload (shape §6.8) |
+| status | text (CHECK) | `open` \| `approved` \| `dismissed` (§2) |
+| created_at / updated_at | timestamptz | — |
+
+### 4.9 `cron_jobs` — scheduled-run definitions (U10 Automation manager)
+
+The Console toggles/edits schedules; a scheduler enqueues `jobs` when due. (Wiring a scheduler is deferred; the table is the contract.)
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | uuid PK | — |
+| name | text | human label |
+| module | text | which P-module this schedule runs |
+| filter | jsonb | optional selector, e.g. `{"status":"discovered"}` (shape §6.9) |
+| schedule | text | cron expression or `daily` / `weekly` |
+| enabled | boolean | on/off toggle |
+| last_run_at / next_run_at | timestamptz (nullable) | scheduler bookkeeping |
+| last_status | text | outcome of the last run |
+| created_by | text | operator id |
+| created_at / updated_at | timestamptz | — |
+
+### 4.10 `versions` — append-only product edit log (U04, U11)
+
+One row per field change; the Console shows a diff view and logs the before/after here.
+
+| Field | Type | Meaning |
+|---|---|---|
+| id | uuid PK | — |
+| product_id | uuid FK→products | which product changed |
+| field_name | text | which field |
+| old_value | jsonb | prior value |
+| new_value | jsonb | new value |
+| changed_by | text | operator id |
+| changed_at | timestamptz | when |
 
 ---
 
@@ -298,6 +380,79 @@ create index idx_tracking_listing  on tracking(listing_id);
 create index idx_competitors_niche on competitors(niche_id);
 ```
 
+### 5.1 Console control-plane (additive migration `001`)
+
+The four control-plane tables (§4.7–4.10), the two KPI views, and RLS are applied **separately and idempotently** by `db/migrations/001_console_control_plane.sql` (run via `python db/apply_migration.py …`), so they can be added to the already-migrated production DB without dropping the six core tables. Canonical table + view DDL:
+
+```sql
+create table if not exists jobs (
+  id uuid primary key default gen_random_uuid(),
+  module text not null,
+  target_id uuid,
+  params jsonb default '{}'::jsonb,
+  status text not null default 'queued'
+    check (status in ('queued','running','succeeded','failed','cancelled')),
+  cancel_requested boolean default false,
+  requested_by text,
+  requested_at timestamptz default now(),
+  started_at timestamptz,
+  finished_at timestamptz,
+  result jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists ai_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('product','portfolio')),
+  target_id uuid,
+  kind text,
+  body jsonb,
+  status text not null default 'open'
+    check (status in ('open','approved','dismissed')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists cron_jobs (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  module text not null,
+  filter jsonb default '{}'::jsonb,
+  schedule text,
+  enabled boolean default true,
+  last_run_at timestamptz,
+  next_run_at timestamptz,
+  last_status text,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists versions (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(id),
+  field_name text,
+  old_value jsonb,
+  new_value jsonb,
+  changed_by text,
+  changed_at timestamptz default now()
+);
+
+-- set_updated_at() triggers on jobs / ai_suggestions / cron_jobs; indexes on the above.
+
+-- KPI views (security_invoker = on, so the caller's RLS applies)
+create or replace view pipeline_stage_counts with (security_invoker = on) as
+  select 'niche:'||status::text as stage, count(*)::int as count from niches group by status
+  union all
+  select 'product:'||status::text as stage, count(*)::int as count from products group by status;
+
+-- product_revenue_30d is a best-effort ESTIMATE (latest tracking snapshot per listing in the
+-- last 30 days × listings.price) — there is no sales/orders table yet, so it is not booked revenue.
+```
+
+**RLS (policies in the migration).** RLS is enabled on all ten tables. `authenticated` (the operator) gets SELECT everywhere; INSERT/UPDATE only on `jobs`, `ai_suggestions`, `versions`, `products`, `qc_results`, `cron_jobs`; the pipeline-owned tables (`niches`, `listings`, `tracking`, `competitors`) stay read-only from the browser. `anon` gets no policy → denied. No DELETE policies (retire, never hard-delete). `service_role` bypasses RLS, so the pipeline is unaffected.
+
 ---
 
 ## 6. JSONB shapes (canonical — modules must conform)
@@ -349,6 +504,26 @@ The jsonb blobs are where drift happens. These are the agreed shapes.
   "differentiation": 0.90, "design": 0.80, "usability": 0.85,
   "completeness": 0.88, "value": 0.80, "weighted": 86.0
 }
+```
+
+**6.6 `jobs.params`** (Console → worker; `argv` is the CLI contract the dispatcher passes through)
+```json
+{"argv": ["--limit", "5"]}
+```
+
+**6.7 `jobs.result`** (worker → Console)
+```json
+{"exit_code": 0, "summary": "3 winners expanded, 1 dud proposed", "error": null}
+```
+
+**6.8 `ai_suggestions.body`**
+```json
+{"summary": "Retire 'ADHD daily v1' — zero sales in 90d", "action": {"module": "P26", "kind": "retire", "target_id": "…"}}
+```
+
+**6.9 `cron_jobs.filter`** (optional row selector for the module the schedule runs)
+```json
+{"status": "discovered", "channel": "etsy"}
 ```
 
 ---

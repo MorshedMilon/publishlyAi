@@ -123,3 +123,103 @@ create index idx_qc_product_gate   on qc_results(product_id, gate);
 create index idx_listings_product  on listings(product_id);
 create index idx_tracking_listing  on tracking(listing_id);
 create index idx_competitors_niche on competitors(niche_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Console control-plane (DATA-SCHEMA §4.7–4.10 / §5.1). Idempotent so a from-scratch
+-- rebuild here matches an incremental apply of db/migrations/001_console_control_plane.sql.
+-- Applied separately against an already-migrated DB via `python db/apply_migration.py`.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table if not exists jobs (
+  id uuid primary key default gen_random_uuid(),
+  module text not null,
+  target_id uuid,
+  params jsonb default '{}'::jsonb,
+  status text not null default 'queued'
+    check (status in ('queued','running','succeeded','failed','cancelled')),
+  cancel_requested boolean default false,
+  requested_by text,
+  requested_at timestamptz default now(),
+  started_at timestamptz,
+  finished_at timestamptz,
+  result jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists ai_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('product','portfolio')),
+  target_id uuid,
+  kind text,
+  body jsonb,
+  status text not null default 'open'
+    check (status in ('open','approved','dismissed')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists cron_jobs (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  module text not null,
+  filter jsonb default '{}'::jsonb,
+  schedule text,
+  enabled boolean default true,
+  last_run_at timestamptz,
+  next_run_at timestamptz,
+  last_status text,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists versions (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(id),
+  field_name text,
+  old_value jsonb,
+  new_value jsonb,
+  changed_by text,
+  changed_at timestamptz default now()
+);
+
+drop trigger if exists trg_jobs_updated on jobs;
+create trigger trg_jobs_updated before update on jobs
+  for each row execute function set_updated_at();
+drop trigger if exists trg_ai_suggestions_updated on ai_suggestions;
+create trigger trg_ai_suggestions_updated before update on ai_suggestions
+  for each row execute function set_updated_at();
+drop trigger if exists trg_cron_jobs_updated on cron_jobs;
+create trigger trg_cron_jobs_updated before update on cron_jobs
+  for each row execute function set_updated_at();
+
+create index if not exists idx_jobs_status_module    on jobs(status, module);
+create index if not exists idx_ai_suggestions_status on ai_suggestions(status, scope);
+create index if not exists idx_versions_product      on versions(product_id);
+create index if not exists idx_cron_jobs_enabled     on cron_jobs(enabled);
+
+create or replace view pipeline_stage_counts with (security_invoker = on) as
+  select 'niche:'||status::text   as stage, count(*)::int as count from niches   group by status
+  union all
+  select 'product:'||status::text as stage, count(*)::int as count from products group by status;
+
+create or replace view product_revenue_30d with (security_invoker = on) as
+  select
+    l.product_id,
+    sum(coalesce(t.units_sold, t.est_sales, 0) * coalesce(l.price, 0))::numeric as revenue_30d_est,
+    max(t.snapshot_at) as last_snapshot_at
+  from listings l
+  join lateral (
+    select units_sold, est_sales, snapshot_at
+    from tracking
+    where listing_id = l.id and snapshot_at >= now() - interval '30 days'
+    order by snapshot_at desc
+    limit 1
+  ) t on true
+  group by l.product_id;
+
+grant select on pipeline_stage_counts to authenticated;
+grant select on product_revenue_30d  to authenticated;
+
+-- RLS: full policy set lives in db/migrations/001_console_control_plane.sql (§5.1).
